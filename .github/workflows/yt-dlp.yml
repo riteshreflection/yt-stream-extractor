@@ -17,19 +17,24 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install yt-dlp
 
-      - name: Extract streaming URL
+      - name: Write YouTube cookies file
+        # You must create a repo secret named YOUTUBE_COOKIES containing your exported cookies.txt content
+        run: echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+
+      - name: Extract streaming URL with cookies
         id: extract
         run: |
           echo "YouTube URL: ${{ github.event.inputs.youtube_url }}"
-          stream_url=$(yt-dlp -g "${{ github.event.inputs.youtube_url }}")
+          stream_url=$(yt-dlp --cookies cookies.txt -g "${{ github.event.inputs.youtube_url }}")
           echo "STREAM_URL=$stream_url" >> $GITHUB_ENV
           echo "✅ Stream URL extracted: $stream_url"
 
       - name: Save to Gist
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          STREAM_URL: ${{ env.STREAM_URL }}
         run: |
           curl -X POST -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            -d "{\"description\": \"YouTube Stream URL\",\"public\": true,\"files\": {\"stream_url.txt\": {\"content\": \"${{ env.STREAM_URL }}\"}}}" \
+            -d "{\"description\": \"YouTube Stream URL\",\"public\": true,\"files\": {\"stream_url.txt\": {\"content\": \"$STREAM_URL\"}}}" \
             https://api.github.com/gists
