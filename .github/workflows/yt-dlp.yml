@@ -6,30 +6,30 @@ on:
       youtube_url:
         description: 'YouTube URL'
         required: true
-        type: string
 
 jobs:
   extract-stream:
     runs-on: ubuntu-latest
+
     steps:
       - name: Install yt-dlp
         run: |
-          sudo apt update
-          sudo apt install -y python3-pip
-          pip install -U yt-dlp
+          python3 -m pip install --upgrade pip
+          pip install yt-dlp
 
       - name: Extract streaming URL
         id: extract
         run: |
-          yt_url="${{ github.event.inputs.youtube_url }}"
-          stream_url=$(yt-dlp -g "$yt_url")
+          echo "YouTube URL: ${{ github.event.inputs.youtube_url }}"
+          stream_url=$(yt-dlp -g "${{ github.event.inputs.youtube_url }}")
           echo "STREAM_URL=$stream_url" >> $GITHUB_ENV
-          echo "Stream URL: $stream_url"
+          echo "✅ Stream URL extracted: $stream_url"
 
-      - name: Save to Gist (optional: or post to JSONBin)
+      - name: Save to Gist
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           curl -X POST -H "Authorization: token $GH_TOKEN" \
-               -d "{\"files\": {\"stream_url.txt\": {\"content\": \"${{ env.STREAM_URL }}\"}}}" \
-               https://api.github.com/gists
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "{\"description\": \"YouTube Stream URL\",\"public\": true,\"files\": {\"stream_url.txt\": {\"content\": \"${{ env.STREAM_URL }}\"}}}" \
+            https://api.github.com/gists
