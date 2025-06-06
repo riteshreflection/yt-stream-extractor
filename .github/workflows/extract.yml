@@ -1,0 +1,38 @@
+name: Extract YouTube Stream URL
+
+on:
+  repository_dispatch:
+    types: [run-yt-dlp]
+
+jobs:
+  extract-stream-url:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install yt-dlp
+        run: pip install yt-dlp
+
+      - name: Extract Stream URL
+        id: extract
+        run: |
+          mkdir -p data
+          yt_url="${{ github.event.client_payload.url }}"
+          video_id=$(yt-dlp --get-id "$yt_url")
+          stream_url=$(yt-dlp -f best -g "$yt_url")
+          echo "{\"stream_url\": \"$stream_url\", \"timestamp\": \"$(date -u +%FT%TZ)\"}" > data/$video_id.json
+
+      - name: Commit and Push
+        run: |
+          git config user.name "yt-dlp-bot"
+          git config user.email "yt-dlp-bot@example.com"
+          git add data/
+          git commit -m "Add stream URL"
+          git push
