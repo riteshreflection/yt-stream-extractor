@@ -1,38 +1,40 @@
 name: Extract YouTube Stream URL
 
 on:
-  repository_dispatch:
-    types: [run-yt-dlp]
+  workflow_dispatch:
+    inputs:
+      youtube_url:
+        description: 'YouTube URL'
+        required: true
 
 jobs:
-  extract-stream-url:
+  extract-stream:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
       - name: Install yt-dlp
-        run: pip install yt-dlp
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install yt-dlp
 
-      - name: Extract Stream URL
+      - name: Save YouTube cookies file
+        run: echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+
+      - name: Extract streaming URL using yt-dlp and cookies
         id: extract
         run: |
-          mkdir -p data
-          yt_url="${{ github.event.client_payload.url }}"
-          video_id=$(yt-dlp --get-id "$yt_url")
-          stream_url=$(yt-dlp -f best -g "$yt_url")
-          echo "{\"stream_url\": \"$stream_url\", \"timestamp\": \"$(date -u +%FT%TZ)\"}" > data/$video_id.json
+          echo "📺 Extracting: ${{ github.event.inputs.youtube_url }}"
+          stream_url=$(yt-dlp --cookies cookies.txt -g "${{ github.event.inputs.youtube_url }}")
+          echo "STREAM_URL=$stream_url" >> $GITHUB_ENV
+          echo "::set-output name=stream_url::$stream_url"
+          echo "✅ Stream URL extracted"
 
-      - name: Commit and Push
+      - name: Save streaming URL to Gist
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # Must be PAT with 'gist' scope
+          STREAM_URL: ${{ env.STREAM_URL }}
         run: |
-          git config user.name "yt-dlp-bot"
-          git config user.email "yt-dlp-bot@example.com"
-          git add data/
-          git commit -m "Add stream URL"
-          git push
+          curl -X POST -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "{\"description\": \"YouTube Stream URL\",\"public\": true,\"files\": {\"stream_url.txt\": {\"content\": \"$STREAM_URL\"}}}" \
+            https://api.github.com/gists
